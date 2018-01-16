@@ -5,7 +5,7 @@
 extern crate criterion;
 extern crate rand;
 extern crate test;
-extern crate mpir;
+extern crate mxpir;
 
 extern crate serde;
 
@@ -14,11 +14,11 @@ extern crate serde_derive;
 
 use criterion::Bencher;
 use std::time::Duration;
-use mpir::client::MultiPirClient;
-use mpir::server::MultiPirServer;
-use mpir::pbc::{BatchCode, Tuple};
-use mpir::pbc::cuckoo::CuckooCode;
-use mpir::pbc::pung::PungCode;
+use mxpir::client::MultiPirClient;
+use mxpir::server::MultiPirServer;
+use mxpir::pbc::{BatchCode, Tuple};
+use mxpir::pbc::cuckoo::CuckooCode;
+use mxpir::pbc::pung::PungCode;
 
 use rand::ChaChaRng;
 use rand::Rng;
@@ -80,7 +80,7 @@ macro_rules! element {
 
 
 macro_rules! pir_setup_cuckoo {
-    ($name:ident, $k:expr, $num:expr, $logt:expr, $d:expr, $size:expr) => (
+    ($name:ident, $k:expr, $num:expr, $alpha:expr, $d:expr, $size:expr) => (
 
         #[test]
         fn $name() {
@@ -101,8 +101,7 @@ macro_rules! pir_setup_cuckoo {
 
                 b.iter(|| {
                         let buckets = code.encode(&collection);
-                        MultiPirServer::new_setup(&buckets[..], ($size + get_size!(usize)) as u32, 
-                                                  2048, $logt,  $d);
+                        MultiPirServer::new(&buckets[..], $alpha, $d);
                     }
                 );
             }
@@ -115,7 +114,7 @@ macro_rules! pir_setup_cuckoo {
 
 
 macro_rules! pir_setup_pung {
-    ($name:ident, $k:expr, $num:expr, $logt:expr, $d:expr, $size:expr) => (
+    ($name:ident, $k:expr, $num:expr, $alpha:expr, $d:expr, $size:expr) => (
 
         #[test]
         fn $name() {
@@ -136,8 +135,7 @@ macro_rules! pir_setup_pung {
 
                 b.iter(|| {
                         let buckets = code.encode(&collection);
-                        MultiPirServer::new_setup(&buckets[..], ($size + get_size!(usize)) as u32, 
-                                                  2048, $logt, $d);
+                        MultiPirServer::new(&buckets[..], $alpha, $d);
                     }
                 );
             }
@@ -163,8 +161,8 @@ macro_rules! generate_oracle {
         }
 
         let oracle = $code.encode(&collection);
-        let sizes: Vec<(u32, u32)> = oracle.iter()
-            .map(|vec| (vec.len() as u32, get_size!((usize, Element)) as u32))
+        let sizes: Vec<(u64, u64)> = oracle.iter()
+            .map(|vec| (vec.len() as u64, get_size!((usize, Element)) as u64))
             .collect();
 
         (oracle, sizes)
@@ -173,7 +171,7 @@ macro_rules! generate_oracle {
 
 
 macro_rules! pir_query_cuckoo {
-    ($name:ident, $k:expr, $num:expr, $logt:expr, $d:expr, $size:expr) => (
+    ($name:ident, $k:expr, $num:expr, $alpha:expr, $d:expr, $size:expr) => (
 
         #[test]
         fn $name() {
@@ -188,7 +186,7 @@ macro_rules! pir_query_cuckoo {
                 let (oracle, sizes) = generate_oracle!($size, $num, code, rng); 
 
                 // Create the client
-                let client = MultiPirClient::new(&sizes, 2048, $logt, $d);
+                let client = MultiPirClient::new(&sizes, $alpha, $d);
 
                 // Generate keys (desired indexes)
                 let mut key_set: HashSet<usize> = HashSet::new();
@@ -223,13 +221,13 @@ macro_rules! pir_query_cuckoo {
 
                     for bucket in 0..oracle.len() {
                         if indexes.contains_key(&bucket) {
-                            ind_vec.push(indexes[&bucket] as u32);
+                            ind_vec.push(indexes[&bucket] as u64);
                         } else {
-                            ind_vec.push(rng.next_u32() % sizes[bucket].0);
+                            ind_vec.push(rng.next_u64() % sizes[bucket].0);
                         }
                     }
 
-                    client.gen_query(&ind_vec);
+                    client.gen_query(&ind_vec[..]);
               });
             }
 
@@ -241,7 +239,7 @@ macro_rules! pir_query_cuckoo {
 
 
 macro_rules! pir_query_pung {
-    ($name:ident, $k:expr, $num:expr, $logt:expr, $d:expr, $size:expr) => (
+    ($name:ident, $k:expr, $num:expr, $alpha:expr, $d:expr, $size:expr) => (
 
         #[test]
         fn $name() {
@@ -256,7 +254,7 @@ macro_rules! pir_query_pung {
                 let (oracle, sizes) = generate_oracle!($size, $num, code, rng); 
 
                 // Create the client
-                let client = MultiPirClient::new(&sizes, 2048, $logt, $d);
+                let client = MultiPirClient::new(&sizes, $alpha, $d);
 
                 // Get label mapping (since Pung is data-dependent...)
                 let mut labels: HashMap<usize, Vec<usize>> = HashMap::new();
@@ -323,13 +321,13 @@ macro_rules! pir_query_pung {
 
                         for bucket in 0..oracle.len() {
                             if indexes.contains_key(&bucket) {
-                                ind_vec.push(indexes[&bucket] as u32);
+                                ind_vec.push(indexes[&bucket] as u64);
                             } else {
-                                ind_vec.push(rng.next_u32() % sizes[bucket].0);
+                                ind_vec.push(rng.next_u64() % sizes[bucket].0);
                             }
                         }
 
-                        client.gen_query(&ind_vec);
+                        client.gen_query(&ind_vec[..]);
               });
             }
 
@@ -340,7 +338,7 @@ macro_rules! pir_query_pung {
 }
 
 macro_rules! pir_reply_cuckoo {
-    ($name:ident, $k:expr, $num:expr, $logt:expr, $d:expr, $size:expr) => (
+    ($name:ident, $k:expr, $num:expr, $alpha:expr, $d:expr, $size:expr) => (
 
         #[test]
         fn $name() {
@@ -383,26 +381,22 @@ macro_rules! pir_reply_cuckoo {
                     .collect();
 
                 // Create the client and the server
-                let client = MultiPirClient::new(&sizes, 2048, $logt, $d);
-                let mut server = MultiPirServer::new(&sizes, 2048, $logt,  $d);
-                server.setup(&oracle);
-
-                let galois = client.get_galois_keys();
-                server.set_galois_keys(&galois, 0);
+                let client = MultiPirClient::new(&sizes, $alpha, $d);
+                let server = MultiPirServer::new(&oracle, $alpha,  $d);
 
                 let mut ind_vec = Vec::with_capacity(oracle.len());
 
                 for bucket in 0..oracle.len() {
                     if indexes.contains_key(&bucket) {
-                        ind_vec.push(indexes[&bucket] as u32);
+                        ind_vec.push(indexes[&bucket] as u64);
                     } else {
-                        ind_vec.push(rng.next_u32() % sizes[bucket].0);
+                        ind_vec.push(rng.next_u64() % sizes[bucket].0);
                     }
                 }
 
-                let query = client.gen_query(&ind_vec);
+                let query = client.gen_query(&ind_vec[..]);
 
-                b.iter(|| server.gen_replies(&query, 0) );
+                b.iter(|| server.gen_replies(&query) );
             }
 
             let mut bmark = bmark_settings!();
@@ -412,7 +406,7 @@ macro_rules! pir_reply_cuckoo {
 }
 
 macro_rules! pir_reply_pung {
-    ($name:ident, $k:expr, $num:expr, $logt:expr, $d:expr, $size:expr) => (
+    ($name:ident, $k:expr, $num:expr, $alpha:expr, $d:expr, $size:expr) => (
 
         #[test]
         fn $name() {
@@ -427,13 +421,8 @@ macro_rules! pir_reply_pung {
                 let (oracle, sizes) = generate_oracle!($size, $num, code, rng); 
 
                 // Create the client and the server
-                let client = MultiPirClient::new(&sizes, 2048, $logt, $d);
-                let mut server = MultiPirServer::new(&sizes, 2048, $logt, $d);
-                server.setup(&oracle);
-
-                let galois = client.get_galois_keys();
-                server.set_galois_keys(&galois, 0);
-
+                let client = MultiPirClient::new(&sizes,  $alpha, $d);
+                let server = MultiPirServer::new(&oracle, $alpha, $d);
 
                 // Get label mapping (since Pung is data-dependent...)
                 let mut labels: HashMap<usize, Vec<usize>> = HashMap::new();
@@ -498,15 +487,15 @@ macro_rules! pir_reply_pung {
 
                 for bucket in 0..oracle.len() {
                     if indexes.contains_key(&bucket) {
-                        ind_vec.push(indexes[&bucket] as u32);
+                        ind_vec.push(indexes[&bucket] as u64);
                     } else {
-                        ind_vec.push(rng.next_u32() % sizes[bucket].0);
+                        ind_vec.push(rng.next_u64() % sizes[bucket].0);
                     }
                 }
 
-                let query = client.gen_query(&ind_vec);
+                let query = client.gen_query(&ind_vec[..]);
 
-                b.iter(|| server.gen_replies(&query, 0) );
+                b.iter(|| server.gen_replies(&query) );
             }
 
             let mut bmark = bmark_settings!();
@@ -516,7 +505,7 @@ macro_rules! pir_reply_pung {
 }
 
 macro_rules! pir_decode_cuckoo {
-    ($name:ident, $k:expr, $num:expr, $logt:expr, $d:expr, $size:expr) => (
+    ($name:ident, $k:expr, $num:expr, $alpha:expr, $d:expr, $size:expr) => (
 
         #[test]
         fn $name() {
@@ -559,25 +548,21 @@ macro_rules! pir_decode_cuckoo {
                     .collect();
 
                 // Create the client and the server
-                let client = MultiPirClient::new(&sizes, 2048, $logt, $d);
-                let mut server = MultiPirServer::new(&sizes, 2048, $logt,  $d);
-                server.setup(&oracle);
-
-                let galois = client.get_galois_keys();
-                server.set_galois_keys(&galois, 0);
+                let client = MultiPirClient::new(&sizes, $alpha, $d);
+                let server = MultiPirServer::new(&oracle, $alpha,  $d);
 
                 let mut ind_vec = Vec::with_capacity(oracle.len());
 
                 for bucket in 0..oracle.len() {
                     if indexes.contains_key(&bucket) {
-                        ind_vec.push(indexes[&bucket] as u32);
+                        ind_vec.push(indexes[&bucket] as u64);
                     } else {
-                        ind_vec.push(rng.next_u32() % sizes[bucket].0);
+                        ind_vec.push(rng.next_u64() % sizes[bucket].0);
                     }
                 }
 
-                let query = client.gen_query(&ind_vec);
-                let reply = server.gen_replies(&query, 0);
+                let query = client.gen_query(&ind_vec[..]);
+                let reply = server.gen_replies(&query);
 
                 let mut query_size = 0;
                 let mut reply_size = 0;
@@ -633,27 +618,23 @@ macro_rules! pir_decode_cuckoo {
                     .collect();
 
                 // Create the client and the server
-                let client = MultiPirClient::new(&sizes, 2048, $logt, $d);
-                let mut server = MultiPirServer::new(&sizes, 2048, $logt,  $d);
-                server.setup(&oracle);
-
-                let galois = client.get_galois_keys();
-                server.set_galois_keys(&galois, 0);
+                let client = MultiPirClient::new(&sizes, $alpha, $d);
+                let server = MultiPirServer::new(&oracle, $alpha,  $d);
 
                 let mut ind_vec = Vec::with_capacity(oracle.len());
 
                 for bucket in 0..oracle.len() {
                     if indexes.contains_key(&bucket) {
-                        ind_vec.push(indexes[&bucket] as u32);
+                        ind_vec.push(indexes[&bucket] as u64);
                     } else {
-                        ind_vec.push(rng.next_u32() % sizes[bucket].0);
+                        ind_vec.push(rng.next_u64() % sizes[bucket].0);
                     }
                 }
 
-                let query = client.gen_query(&ind_vec);
-                let reply = server.gen_replies(&query, 0);
+                let query = client.gen_query(&ind_vec[..]);
+                let reply = server.gen_replies(&query);
 
-                b.iter(|| client.decode_replies::<Tuple<usize, Element>>(&ind_vec[..], &reply) );
+                b.iter(|| client.decode_replies::<Tuple<usize, Element>>(&reply) );
             }
 
             let mut bmark = bmark_settings!();
@@ -663,7 +644,7 @@ macro_rules! pir_decode_cuckoo {
 }
 
 macro_rules! pir_decode_pung {
-    ($name:ident, $k:expr, $num:expr, $logt:expr, $d:expr, $size:expr) => (
+    ($name:ident, $k:expr, $num:expr, $alpha:expr, $d:expr, $size:expr) => (
 
         #[test]
         fn $name() {
@@ -738,25 +719,21 @@ macro_rules! pir_decode_pung {
                 }
 
                 // Create the client and the server
-                let client = MultiPirClient::new(&sizes, 2048, $logt, $d);
-                let mut server = MultiPirServer::new(&sizes, 2048, $logt,  $d);
-                server.setup(&oracle);
-
-                let galois = client.get_galois_keys();
-                server.set_galois_keys(&galois, 0);
+                let client = MultiPirClient::new(&sizes, $alpha, $d);
+                let server = MultiPirServer::new(&oracle, $alpha,  $d);
 
                 let mut ind_vec = Vec::with_capacity(oracle.len());
 
                 for bucket in 0..oracle.len() {
                     if indexes.contains_key(&bucket) {
-                        ind_vec.push(indexes[&bucket] as u32);
+                        ind_vec.push(indexes[&bucket] as u64);
                     } else {
-                        ind_vec.push(rng.next_u32() % sizes[bucket].0);
+                        ind_vec.push(rng.next_u64() % sizes[bucket].0);
                     }
                 }
 
-                let query = client.gen_query(&ind_vec);
-                let reply = server.gen_replies(&query, 0);
+                let query = client.gen_query(&ind_vec[..]);
+                let reply = server.gen_replies(&query);
 
                 let mut query_size = 0;
                 let mut reply_size = 0;
@@ -784,12 +761,8 @@ macro_rules! pir_decode_pung {
                 let (oracle, sizes) = generate_oracle!($size, $num, code, rng); 
 
                 // Create the client and the server
-                let client = MultiPirClient::new(&sizes, 2048, $logt, $d);
-                let mut server = MultiPirServer::new(&sizes, 2048, $logt,  $d);
-                server.setup(&oracle);
-
-                let galois = client.get_galois_keys();
-                server.set_galois_keys(&galois, 0);
+                let client = MultiPirClient::new(&sizes, $alpha, $d);
+                let server = MultiPirServer::new(&oracle, $alpha,  $d);
 
                 // Get label mapping (since Pung is data-dependent...)
                 let mut labels: HashMap<usize, Vec<usize>> = HashMap::new();
@@ -854,15 +827,15 @@ macro_rules! pir_decode_pung {
 
                 for bucket in 0..oracle.len() {
                     if indexes.contains_key(&bucket) {
-                        ind_vec.push(indexes[&bucket] as u32);
+                        ind_vec.push(indexes[&bucket] as u64);
                     } else {
-                        ind_vec.push(rng.next_u32() % sizes[bucket].0);
+                        ind_vec.push(rng.next_u64() % sizes[bucket].0);
                     }
                 }
 
-                let query = client.gen_query(&ind_vec);
-                let reply = server.gen_replies(&query, 0);
-                b.iter(||  client.decode_replies::<Tuple<usize, Element>>(&ind_vec[..], &reply) );
+                let query = client.gen_query(&ind_vec[..]);
+                let reply = server.gen_replies(&query);
+                b.iter(||  client.decode_replies::<Tuple<usize, Element>>(&reply) );
             }
 
             let mut bmark = bmark_settings!();
@@ -873,43 +846,43 @@ macro_rules! pir_decode_pung {
 
 
 // Parameters: 
-// bench name, k, number of entries, logt, d, size of each entry
+// bench name, k, number of entries, alpha, d, size of each entry
 
-const SIZE: u32 = 1 << 16;
+const SIZE: u32 = 1 << 20;
 const ELE_SIZE: usize = 288 - 8; // usize since index adds 4 bytes
 
 // SETUP
-pir_setup_cuckoo!(setup_cuckoo_k16, 16, SIZE, 20, 2, ELE_SIZE);
-pir_setup_cuckoo!(setup_cuckoo_k64, 64, SIZE, 20, 2, ELE_SIZE);
-pir_setup_cuckoo!(setup_cuckoo_k256, 256, SIZE, 20, 2, ELE_SIZE);
+pir_setup_cuckoo!(setup_cuckoo_k16, 16, SIZE, 16, 2, ELE_SIZE);
+pir_setup_cuckoo!(setup_cuckoo_k64, 64, SIZE, 16, 2, ELE_SIZE);
+pir_setup_cuckoo!(setup_cuckoo_k256, 256, SIZE, 16, 2, ELE_SIZE);
 
-pir_setup_pung!(setup_pung_k16, 16, SIZE, 20, 2, ELE_SIZE);
-pir_setup_pung!(setup_pung_k64, 64, SIZE, 20, 2, ELE_SIZE);
-pir_setup_pung!(setup_pung_k256, 256, SIZE, 20, 2, ELE_SIZE);
+pir_setup_pung!(setup_pung_k16, 16, SIZE, 16, 2, ELE_SIZE);
+pir_setup_pung!(setup_pung_k64, 64, SIZE, 16, 2, ELE_SIZE);
+pir_setup_pung!(setup_pung_k256, 256, SIZE, 16, 2, ELE_SIZE);
 
 // QUERY
-pir_query_cuckoo!(query_cuckoo_k16, 16, SIZE, 20, 2, ELE_SIZE);
-pir_query_cuckoo!(query_cuckoo_k64, 64, SIZE, 20, 2, ELE_SIZE);
-pir_query_cuckoo!(query_cuckoo_k256, 256, SIZE, 20, 2, ELE_SIZE);
+pir_query_cuckoo!(query_cuckoo_k16, 16, SIZE, 16, 2, ELE_SIZE);
+pir_query_cuckoo!(query_cuckoo_k64, 64, SIZE, 16, 2, ELE_SIZE);
+pir_query_cuckoo!(query_cuckoo_k256, 256, SIZE, 16, 2, ELE_SIZE);
 
-pir_query_pung!(query_pung_k16, 16, SIZE, 20, 2, ELE_SIZE);
-pir_query_pung!(query_pung_k64, 64, SIZE, 20, 2, ELE_SIZE);
-pir_query_pung!(query_pung_k256, 256, SIZE, 20, 2, ELE_SIZE);
+pir_query_pung!(query_pung_k16, 16, SIZE, 16, 2, ELE_SIZE);
+pir_query_pung!(query_pung_k64, 64, SIZE, 16, 2, ELE_SIZE);
+pir_query_pung!(query_pung_k256, 256, SIZE, 16, 2, ELE_SIZE);
 
 // REPLY 
-pir_reply_cuckoo!(reply_cuckoo_k16, 16, SIZE, 20, 2, ELE_SIZE);
-pir_reply_cuckoo!(reply_cuckoo_k64, 64, SIZE, 20, 2, ELE_SIZE);
-pir_reply_cuckoo!(reply_cuckoo_k256, 256, SIZE, 20, 2, ELE_SIZE);
+pir_reply_cuckoo!(reply_cuckoo_k16, 16, SIZE, 16, 2, ELE_SIZE);
+pir_reply_cuckoo!(reply_cuckoo_k64, 64, SIZE, 16, 2, ELE_SIZE);
+pir_reply_cuckoo!(reply_cuckoo_k256, 256, SIZE, 16, 2, ELE_SIZE);
 
-pir_reply_pung!(reply_pung_k16, 16, SIZE, 20, 2, ELE_SIZE);
-pir_reply_pung!(reply_pung_k64, 64, SIZE, 20, 2, ELE_SIZE);
-pir_reply_pung!(reply_pung_k256, 256, SIZE, 20, 2, ELE_SIZE);
+pir_reply_pung!(reply_pung_k16, 16, SIZE, 16, 2, ELE_SIZE);
+pir_reply_pung!(reply_pung_k64, 64, SIZE, 16, 2, ELE_SIZE);
+pir_reply_pung!(reply_pung_k256, 256, SIZE, 16, 2, ELE_SIZE);
 
 // DECODE
-pir_decode_cuckoo!(decode_cuckoo_k16, 16, SIZE, 20, 2, ELE_SIZE);
-pir_decode_cuckoo!(decode_cuckoo_k64, 64, SIZE, 20, 2, ELE_SIZE);
-pir_decode_cuckoo!(decode_cuckoo_k256, 256, SIZE, 20, 2, ELE_SIZE);
+pir_decode_cuckoo!(decode_cuckoo_k16, 16, SIZE, 16, 2, ELE_SIZE);
+pir_decode_cuckoo!(decode_cuckoo_k64, 64, SIZE, 16, 2, ELE_SIZE);
+pir_decode_cuckoo!(decode_cuckoo_k256, 256, SIZE, 16, 2, ELE_SIZE);
 
-pir_decode_pung!(decode_pung_k16, 16, SIZE, 20, 2, ELE_SIZE);
-pir_decode_pung!(decode_pung_k64, 64, SIZE, 20, 2, ELE_SIZE);
-pir_decode_pung!(decode_pung_k256, 256, SIZE, 20, 2, ELE_SIZE);
+pir_decode_pung!(decode_pung_k16, 16, SIZE, 16, 2, ELE_SIZE);
+pir_decode_pung!(decode_pung_k64, 64, SIZE, 16, 2, ELE_SIZE);
+pir_decode_pung!(decode_pung_k256, 256, SIZE, 16, 2, ELE_SIZE);

@@ -1,7 +1,7 @@
 extern crate bincode;
 extern crate crypto;
 extern crate num;
-extern crate sealpir;
+extern crate xpir;
 extern crate rand;
 extern crate serde;
 #[macro_use]

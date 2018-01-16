@@ -1,19 +1,19 @@
 #![feature(test)]
 
-extern crate mpir;
+extern crate mxpir;
 extern crate rand;
 extern crate test;
 
 use test::Bencher;
 use std::mem;
-use mpir::client::MultiPirClient;
-use mpir::server::MultiPirServer;
-use mpir::pbc::{BatchCode, Tuple};
-use mpir::pbc::replication::ReplicationCode;
-use mpir::pbc::sharding::ShardingCode;
-use mpir::pbc::choices::ChoicesCode;
-use mpir::pbc::cuckoo::CuckooCode;
-use mpir::pbc::pung::PungCode;
+use mxpir::client::MultiPirClient;
+use mxpir::server::MultiPirServer;
+use mxpir::pbc::{BatchCode, Tuple};
+use mxpir::pbc::replication::ReplicationCode;
+use mxpir::pbc::sharding::ShardingCode;
+use mxpir::pbc::choices::ChoicesCode;
+use mxpir::pbc::cuckoo::CuckooCode;
+use mxpir::pbc::pung::PungCode;
 use rand::Rng;
 use std::collections::HashMap;
 use std::collections::HashSet;
