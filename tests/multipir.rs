@@ -1,15 +1,15 @@
-extern crate multipir;
+extern crate mxpir;
 extern crate rand;
 
 use std::mem;
-use multipir::client::MultiPirClient;
-use multipir::server::MultiPirServer;
-use multipir::pbc::{BatchCode, Tuple};
-use multipir::pbc::replication::ReplicationCode;
-use multipir::pbc::sharding::ShardingCode;
-use multipir::pbc::choices::ChoicesCode;
-use multipir::pbc::cuckoo::CuckooCode;
-use multipir::pbc::pung::PungCode;
+use mxpir::client::MultiPirClient;
+use mxpir::server::MultiPirServer;
+use mxpir::pbc::{BatchCode, Tuple};
+use mxpir::pbc::replication::ReplicationCode;
+use mxpir::pbc::sharding::ShardingCode;
+use mxpir::pbc::choices::ChoicesCode;
+use mxpir::pbc::cuckoo::CuckooCode;
+use mxpir::pbc::pung::PungCode;
 use rand::Rng;
 use std::collections::HashMap;
 
@@ -18,7 +18,7 @@ macro_rules! get_size {
 }
 
 
-fn multipir_test<T>(k: usize, code: &T)
+fn mxpir_test<T>(k: usize, code: &T)
 where
     T: BatchCode<usize, usize>,
 {
@@ -82,39 +82,39 @@ where
 
 
 #[test]
-fn multipir_test_replication() {
+fn mxpir_test_replication() {
     let k = 8;
     let code = ReplicationCode::new(k);
-    multipir_test(k, &code);
+    mxpir_test(k, &code);
 }
 
 #[test]
-fn multipir_test_sharding() {
+fn mxpir_test_sharding() {
     let k = 16;
     let code = ShardingCode::new(k);
-    multipir_test(k, &code);
+    mxpir_test(k, &code);
 }
 
 #[test]
-fn multipir_test_choice() {
+fn mxpir_test_choice() {
     let k = 16;
     let choices = 2;
     let code = ChoicesCode::new(k, choices);
-    multipir_test(k, &code);
+    mxpir_test(k, &code);
 }
 
 #[test]
-fn multipir_test_cuckoo() {
+fn mxpir_test_cuckoo() {
     let k = 16;
     let replica = 3;
     let factor = 1.3;
     let code = CuckooCode::new(k, replica, factor);
-    multipir_test(k, &code);
+    mxpir_test(k, &code);
 }
 
 
 #[test]
-fn multipir_test_pung() {
+fn mxpir_test_pung() {
     let k = 8;
     let mut code = PungCode::new(k);
 

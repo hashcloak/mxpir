@@ -1,17 +1,17 @@
 [package]
 name = "mxpir"
 version = "0.1.0"
-authors = ["Sebastian Angel <sebs@cs.utexas.edu>"]
+authors = ["Sebastian Angel <sebs@cis.upenn.edu>"]
 
 [dependencies]
-xpir = { path = "../xpir-rust/" }
-rust-crypto = "*"
-serde = "*"
-serde_derive = "*"
-bincode = "*"
-num = "*"
-rand = "*"
-criterion = "*"
+xpir = { git = "https://github.com/sga001/xpir-rust/" }
+rust-crypto = "0.2.36"
+serde = "1.0.94"
+serde_derive = "1.0.94"
+bincode = "1.1.4"
+num = "0.2.0"
+rand = "0.3.23"
+criterion = "0.2.11"
 
 [[bench]]
 name = "pir"
